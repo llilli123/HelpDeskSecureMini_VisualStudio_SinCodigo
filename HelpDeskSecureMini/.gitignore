@@ -1,0 +1,25 @@
+# Secretos y configuraciones locales
+.env
+.env.*
+!.env.example
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/secrets.json
+
+# Resultados de compilación
+**/bin/
+**/obj/
+.vs/
+.idea/
+.vscode/
+
+# Artefactos temporales
+*.user
+*.suo
+*.log
+.DS_Store
+node_modules/
+
+# Datos de pruebas y archivos privados
+uploads/
+private-files/
