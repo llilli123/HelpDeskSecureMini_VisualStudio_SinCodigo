@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: blob:; connect-src 'self' https:; form-action 'self' https:; base-uri 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Detalle del reporte · HelpDesk Secure Mini</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-pagina="detalle">
+  <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
+
+  <header class="encabezado">
+    <div class="encabezado__interior">
+      <a class="marca" href="reportes.html">
+        <span class="marca__logo" aria-hidden="true">HD</span>
+        <span class="marca__texto">HelpDesk <strong>Secure Mini</strong></span>
+      </a>
+      <nav class="navegacion" aria-label="Principal">
+        <ul>
+          <li><a href="reportes.html">Mis reportes</a></li>
+          <li data-solo-admin hidden><a href="admin.html">Administración</a></li>
+        </ul>
+      </nav>
+      <div class="usuario">
+        <span class="usuario__datos">
+          <span id="usuario-nombre" class="usuario__nombre"></span>
+          <span id="usuario-rol" class="etiqueta-rol"></span>
+        </span>
+        <button id="btn-cerrar-sesion" type="button" class="boton boton--fantasma boton--pequeno">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenido" class="contenedor contenedor--estrecho" tabindex="-1">
+    <!-- reportes.html o admin.html según el rol; detalle.js puede ajustar el href -->
+    <a id="enlace-volver" class="enlace-volver" href="reportes.html">&larr; Volver a reportes</a>
+
+    <p id="cargando-detalle" class="cargando" role="status" hidden>
+      <span class="spinner" aria-hidden="true"></span> Cargando reporte…
+    </p>
+
+    <!-- 403/404: mismo mensaje para no revelar si el reporte existe -->
+    <div id="error-detalle" class="aviso aviso--error" role="alert" hidden></div>
+    <div id="mensaje-pagina" class="aviso" role="status" aria-live="polite" hidden></div>
+
+    <article id="detalle-reporte" class="detalle" aria-labelledby="detalle-titulo" hidden>
+      <header class="detalle__cabecera">
+        <div class="detalle__fila">
+          <h1 id="detalle-titulo" class="detalle__titulo"></h1>
+          <span id="detalle-estado" class="estado"></span>
+        </div>
+        <dl class="metadatos">
+          <div><dt>Creado</dt><dd><time id="detalle-creado"></time></dd></div>
+          <div data-solo-admin hidden><dt>Autor</dt><dd id="detalle-autor"></dd></div>
+          <div><dt>Identificador</dt><dd><code id="detalle-id"></code></dd></div>
+        </dl>
+        <!-- Acción exclusiva de administrador. El servidor revalida el rol (PATCH /api/admin/reportes/{id}/cerrar). -->
+        <div class="detalle__acciones" data-solo-admin hidden>
+          <button id="btn-cerrar-reporte" type="button" class="boton boton--peligro boton--pequeno">Cerrar reporte</button>
+        </div>
+      </header>
+
+      <section class="tarjeta" aria-labelledby="titulo-descripcion">
+        <h2 id="titulo-descripcion" class="titulo-seccion">Descripción</h2>
+        <!-- white-space: pre-wrap en CSS; rellenar con textContent -->
+        <p id="detalle-descripcion" class="texto-usuario"></p>
+      </section>
+
+      <section id="seccion-adjuntos" class="tarjeta" aria-labelledby="titulo-adjuntos">
+        <h2 id="titulo-adjuntos" class="titulo-seccion">Imágenes adjuntas</h2>
+        <p id="vacio-adjuntos" class="texto-secundario" hidden>Este reporte no tiene imágenes.</p>
+        <!-- La URL firmada se pide al pulsar el botón (GET /api/reportes/{id}/adjuntos/{archivoId}/url) y expira pronto -->
+        <ul id="lista-adjuntos" class="galeria"></ul>
+        <p class="ayuda">Los enlaces de imagen son temporales y caducan en pocos segundos.</p>
+      </section>
+
+      <section class="tarjeta" aria-labelledby="titulo-conversacion">
+        <h2 id="titulo-conversacion" class="titulo-seccion">Conversación</h2>
+        <p id="vacio-respuestas" class="texto-secundario" hidden>Todavía no hay respuestas.</p>
+        <ol id="lista-respuestas" class="conversacion" aria-live="polite"></ol>
+
+        <!-- Visible solo si el reporte NO está Cerrado -->
+        <form id="form-respuesta" class="formulario formulario--respuesta" novalidate hidden>
+          <div class="campo">
+            <label for="respuesta-mensaje">Escribe una respuesta</label>
+            <textarea id="respuesta-mensaje" name="mensaje" rows="4" maxlength="2000" required
+                      aria-describedby="contador-respuesta"></textarea>
+            <div class="campo__pie">
+              <span></span>
+              <p id="contador-respuesta" class="contador" aria-live="polite">0 / 2000</p>
+            </div>
+          </div>
+          <div id="error-respuesta" class="aviso aviso--error" role="alert" hidden></div>
+          <div class="acciones">
+            <button id="btn-enviar-respuesta" type="submit" class="boton boton--primario">
+              <span class="spinner spinner--boton" aria-hidden="true" hidden></span>
+              Enviar respuesta
+            </button>
+          </div>
+        </form>
+
+        <!-- Visible cuando el estado es Cerrado (o la API responde 409) -->
+        <div id="aviso-cerrado" class="aviso aviso--neutro" hidden>
+          Este reporte está <strong>cerrado</strong>. Ya no admite respuestas.
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <!-- Confirmación de cierre (administrador) -->
+  <dialog id="dialogo-cerrar" class="dialogo" aria-labelledby="dialogo-cerrar-titulo">
+    <form method="dialog">
+      <h2 id="dialogo-cerrar-titulo">¿Cerrar este reporte?</h2>
+      <p>Un reporte cerrado no admite respuestas y no puede reabrirse.</p>
+      <div class="acciones">
+        <button value="cancelar" class="boton boton--fantasma">Cancelar</button>
+        <button value="confirmar" class="boton boton--peligro">Sí, cerrar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ================= Plantillas (rellenar SOLO con textContent) ================= -->
+  <template id="tpl-respuesta">
+    <li class="mensaje">
+      <div class="mensaje__cabecera">
+        <span class="mensaje__autor" data-campo="autor"></span>
+        <span class="etiqueta-rol" data-campo="rol" hidden></span>
+        <time class="mensaje__fecha" data-campo="fecha"></time>
+      </div>
+      <p class="mensaje__texto texto-usuario" data-campo="mensaje"></p>
+    </li>
+  </template>
+
+  <template id="tpl-adjunto">
+    <li class="galeria__item">
+      <figure>
+        <div class="galeria__marco">
+          <img class="galeria__img" data-campo="imagen" alt="" hidden>
+          <span class="galeria__placeholder" aria-hidden="true">IMG</span>
+        </div>
+        <figcaption>
+          <span class="galeria__nombre" data-campo="nombre"></span>
+          <span class="galeria__peso" data-campo="peso"></span>
+        </figcaption>
+      </figure>
+      <button type="button" class="boton boton--secundario boton--pequeno" data-accion="ver-adjunto">Ver imagen</button>
+    </li>
+  </template>
+
+  <script src="js/config.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/detalle.js" defer></script>
+</body>
+</html>

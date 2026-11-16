@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: blob:; connect-src 'self' https:; form-action 'self' https:; base-uri 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Mis reportes · HelpDesk Secure Mini</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-pagina="reportes">
+  <a class="saltar-contenido" href="#contenido">Saltar al contenido</a>
+
+  <header class="encabezado">
+    <div class="encabezado__interior">
+      <a class="marca" href="reportes.html">
+        <span class="marca__logo" aria-hidden="true">HD</span>
+        <span class="marca__texto">HelpDesk <strong>Secure Mini</strong></span>
+      </a>
+      <nav class="navegacion" aria-label="Principal">
+        <ul>
+          <li><a href="reportes.html" aria-current="page">Mis reportes</a></li>
+          <!-- Visible solo si GET /api/me devuelve rol Administrador. Ocultar NO es un control de seguridad. -->
+          <li data-solo-admin hidden><a href="admin.html">Administración</a></li>
+        </ul>
+      </nav>
+      <div class="usuario">
+        <span class="usuario__datos">
+          <span id="usuario-nombre" class="usuario__nombre"></span>
+          <span id="usuario-rol" class="etiqueta-rol"></span>
+        </span>
+        <button id="btn-cerrar-sesion" type="button" class="boton boton--fantasma boton--pequeno">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="contenido" class="contenedor" tabindex="-1">
+    <div class="cabecera-pagina">
+      <h1>Mis reportes</h1>
+      <p class="texto-secundario" data-solo-usuario>Crea un reporte nuevo o consulta el estado de los que ya enviaste.</p>
+      <p class="texto-secundario" data-solo-admin hidden>Como administrador ves todos los reportes del sistema.</p>
+    </div>
+
+    <!-- Mensaje global de la página (éxito al crear, error de red, sesión expirada) -->
+    <div id="mensaje-pagina" class="aviso" role="status" aria-live="polite" hidden></div>
+
+    <div class="rejilla-reportes">
+      <!-- ============ Nuevo reporte ============ -->
+      <section class="tarjeta" aria-labelledby="titulo-nuevo">
+        <h2 id="titulo-nuevo">Nuevo reporte</h2>
+        <form id="form-reporte" class="formulario" enctype="multipart/form-data" novalidate>
+          <div class="campo">
+            <label for="reporte-titulo">Título <span class="requerido" aria-hidden="true">*</span></label>
+            <input id="reporte-titulo" name="titulo" type="text" maxlength="150" required
+                   autocomplete="off" aria-describedby="ayuda-titulo">
+            <p id="ayuda-titulo" class="ayuda">Máximo 150 caracteres. Ej.: «Proyector del aula B-204 no enciende».</p>
+          </div>
+
+          <div class="campo">
+            <label for="reporte-descripcion">Descripción <span class="requerido" aria-hidden="true">*</span></label>
+            <textarea id="reporte-descripcion" name="descripcion" rows="5" maxlength="4000" required
+                      aria-describedby="ayuda-descripcion contador-descripcion"></textarea>
+            <div class="campo__pie">
+              <p id="ayuda-descripcion" class="ayuda">Explica qué ocurre, dónde y desde cuándo.</p>
+              <p id="contador-descripcion" class="contador" aria-live="polite">0 / 4000</p>
+            </div>
+          </div>
+
+          <div class="campo">
+            <span class="campo__etiqueta" id="etiqueta-imagenes">Imágenes (opcional)</span>
+            <!-- El input va antes de la zona para que :focus-visible + .zona-archivos muestre el foco -->
+            <input id="reporte-imagenes" name="imagenes" type="file" class="visualmente-oculto"
+                   accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple
+                   aria-labelledby="etiqueta-imagenes" aria-describedby="error-imagenes">
+            <label for="reporte-imagenes" class="zona-archivos">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="zona-archivos__icono">
+                <path d="M19 13v6H5v-6H3v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6h-2zM11 6.83V16h2V6.83l3.59 3.58L18 9l-6-6-6 6 1.41 1.41L11 6.83z"/>
+              </svg>
+              <span><strong>Selecciona imágenes</strong> o arrástralas aquí</span>
+              <span class="ayuda">Hasta 3 archivos JPG o PNG, máximo 2 MiB cada uno.</span>
+            </label>
+            <!-- Vista previa: reportes.js agrega un <li> por archivo usando la plantilla #tpl-vista-previa -->
+            <ul id="lista-imagenes" class="vista-previa" aria-label="Imágenes seleccionadas"></ul>
+            <p id="error-imagenes" class="ayuda ayuda--error" role="alert" hidden></p>
+          </div>
+
+          <div id="error-reporte" class="aviso aviso--error" role="alert" hidden></div>
+
+          <div class="acciones">
+            <button id="btn-limpiar-reporte" type="reset" class="boton boton--fantasma">Limpiar</button>
+            <button id="btn-enviar-reporte" type="submit" class="boton boton--primario">
+              <span class="spinner spinner--boton" aria-hidden="true" hidden></span>
+              Enviar reporte
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ Listado y búsqueda ============ -->
+      <section class="tarjeta" aria-labelledby="titulo-listado">
+        <div class="tarjeta__cabecera">
+          <h2 id="titulo-listado">Reportes enviados</h2>
+          <form id="form-busqueda" class="busqueda" role="search">
+            <label for="busqueda-titulo" class="visualmente-oculto">Buscar por título</label>
+            <input id="busqueda-titulo" name="search" type="search" maxlength="150"
+                   placeholder="Buscar por título…" autocomplete="off">
+            <button type="submit" class="boton boton--secundario boton--pequeno">Buscar</button>
+          </form>
+        </div>
+
+        <p id="cargando-reportes" class="cargando" role="status" hidden>
+          <span class="spinner" aria-hidden="true"></span> Cargando reportes…
+        </p>
+
+        <div id="vacio-reportes" class="estado-vacio" hidden>
+          <p><strong>No hay reportes para mostrar.</strong></p>
+          <p class="texto-secundario">Cuando envíes un reporte aparecerá aquí.</p>
+        </div>
+
+        <div id="error-reportes" class="aviso aviso--error" role="alert" hidden></div>
+
+        <div class="tabla-envoltura">
+          <table id="tabla-reportes" class="tabla">
+            <caption class="visualmente-oculto">Listado de reportes</caption>
+            <thead>
+              <tr>
+                <th scope="col">Título</th>
+                <th scope="col" data-solo-admin hidden>Autor</th>
+                <th scope="col">Estado</th>
+                <th scope="col">Creado</th>
+                <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
+              </tr>
+            </thead>
+            <tbody id="cuerpo-reportes"></tbody>
+          </table>
+        </div>
+
+        <nav class="paginacion" aria-label="Paginación de reportes">
+          <button id="btn-pagina-anterior" type="button" class="boton boton--fantasma boton--pequeno" disabled>Anterior</button>
+          <span id="indicador-pagina" class="paginacion__indicador" aria-live="polite">Página 1</span>
+          <button id="btn-pagina-siguiente" type="button" class="boton boton--fantasma boton--pequeno" disabled>Siguiente</button>
+        </nav>
+      </section>
+    </div>
+  </main>
+
+  <!-- ================= Plantillas (rellenar SOLO con textContent) ================= -->
+  <template id="tpl-fila-reporte">
+    <tr>
+      <td data-etiqueta="Título"><a class="fila__titulo" data-campo="titulo" href="detalle.html"></a></td>
+      <td data-etiqueta="Autor" data-campo="autor" data-solo-admin hidden></td>
+      <td data-etiqueta="Estado"><span class="estado" data-campo="estado"></span></td>
+      <td data-etiqueta="Creado"><time data-campo="creado"></time></td>
+      <td class="tabla__acciones"><a class="boton boton--fantasma boton--pequeno" data-campo="enlace" href="detalle.html">Ver detalle</a></td>
+    </tr>
+  </template>
+
+  <template id="tpl-vista-previa">
+    <li class="vista-previa__item">
+      <img class="vista-previa__img" data-campo="miniatura" alt="">
+      <span class="vista-previa__nombre" data-campo="nombre"></span>
+      <span class="vista-previa__peso" data-campo="peso"></span>
+      <button type="button" class="boton-icono" data-accion="quitar" aria-label="Quitar imagen">&times;</button>
+    </li>
+  </template>
+
+  <script src="js/config.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/api.js" defer></script>
+  <script src="js/reportes.js" defer></script>
+</body>
+</html>
